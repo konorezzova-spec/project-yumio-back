@@ -26,9 +26,6 @@ app.use(cors()); // Дозвіл для запитів з інших домен�
 app.use(cookieParser()); // Парсинг cookie
 
 // підключаємо групу маршрутів
-// app.get('/', (req, res, next) => {
-//   res.status(200).json({ message: 'Auth route works!' });
-// });
 app.use('/api', authRoutes);
 app.use('/api', usersRoutes);
 app.use('/api', categoriesRoutes);
