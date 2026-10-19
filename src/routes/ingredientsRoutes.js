@@ -1,9 +1,8 @@
 import { Router } from 'express';
+import { getIngredients } from '../controllers/ingredientsController.js';
 
 const router = Router();
 
-router.get('/ingredients', (req, res) => {
-  res.status(200).json({ message: 'Ingredients route works!' });
-});
+router.get('/ingredients', getIngredients);
 
 export default router;

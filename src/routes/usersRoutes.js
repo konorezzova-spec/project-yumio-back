@@ -4,7 +4,7 @@ import {
   getUser,
   updateUserAvatar,
   updateUser,
-} from '../controllers/userController.js';
+} from '../controllers/usersController.js';
 import { upload } from '../middlewares/multer.js';
 
 const router = Router();
