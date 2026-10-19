@@ -2,8 +2,7 @@ import { model, Schema } from 'mongoose';
 
 const userSchema = new Schema(
   {
-    // _id: { type: Schema.Types.ObjectId },
-    name: { type: String, required: false },
+    name: { type: String, trim: true, required: true },
     email: {
       type: String,
       unique: true,

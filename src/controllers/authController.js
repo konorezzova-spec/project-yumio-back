@@ -10,7 +10,7 @@ import { createSession, setSessionCookies } from '../services/auth.js';
 // import fs from 'node:fs/promises';
 
 export const registerUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -21,6 +21,7 @@ export const registerUser = async (req, res) => {
 
   // Створюємо користувача
   const newUser = await User.create({
+    name,
     email,
     password: hashedPassword,
   });
