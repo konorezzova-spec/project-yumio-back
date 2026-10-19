@@ -2,8 +2,15 @@ import { model, Schema } from 'mongoose';
 
 const userSchema = new Schema(
   {
+    // _id: { type: Schema.Types.ObjectId },
     name: { type: String, required: false },
-    email: { type: String, unique: true, required: true },
+    email: {
+      type: String,
+      unique: true,
+      required: true,
+      trim: true,
+      lowercase: true,
+    },
     password: { type: String, required: true },
 
     avatar: {
@@ -14,12 +21,6 @@ const userSchema = new Schema(
   },
   { timestamps: true },
 );
-
-userSchema.pre('save', function () {
-  if (!this.username) {
-    this.username = this.email;
-  }
-});
 
 // Перевизначаємо метод toJSON (видаляємо пароль з відповіді)
 userSchema.methods.toJSON = function () {

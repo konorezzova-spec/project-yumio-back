@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 import { Area } from './area.js';
-import { Categorie } from './area.js';
+import { Categorie } from './categorie.js';
 
 const area = await Area.find().select('name -_id');
 const areaNames = area.map((tag) => tag.name);
@@ -22,7 +22,7 @@ const recipeIngredientSchema = new Schema({
 
 const recipeSchema = new Schema(
   {
-    title: { type: String, required: true, trim: true },
+    title: { type: String, required: true },
     category: { type: String, required: true, enum: [...categorieNames] },
     owner: {
       type: Schema.Types.ObjectId,
@@ -46,5 +46,6 @@ const recipeSchema = new Schema(
 
 // Оновлюємо індекс полем owner, щоб пришвидшити пошук рецептів за власником
 recipeSchema.index({ owner: 1 });
+recipeSchema.index({ category: 'ascending' });
 
-export const recipe = model('Recipe', recipeSchema);
+export const Recipe = model('Recipe', recipeSchema);
