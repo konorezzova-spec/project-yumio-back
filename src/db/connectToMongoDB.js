@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-// import { Recipe } from '../models/recipe.js';
+import { Recipe } from '../models/recipe.js';
 
 export const connectMongoDB = async () => {
   try {
@@ -7,7 +7,7 @@ export const connectMongoDB = async () => {
     await mongoose.connect(mongoUrl);
     console.log('✅ MongoDB connection established successfully');
     // гарантуємо, що індекси в БД відповідають схемі
-    // await Recipe.syncIndexes();
+    await Recipe.syncIndexes();
     console.log('Indexes synced successfully');
   } catch (error) {
     console.error('❌ Failed to connect to MongoDB:', error.message);
