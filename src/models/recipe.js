@@ -4,11 +4,11 @@ const recipeIngredientSchema = new Schema({
   id: {
     type: String,
     ref: 'ingredient',
-    // required: true,
+    required: true,
   },
   measure: {
     type: String,
-    // required: true,
+    required: true,
   },
 });
 
@@ -31,7 +31,7 @@ const recipeSchema = new Schema(
     time: { type: Number, required: true },
     ingredients: {
       type: [recipeIngredientSchema],
-      // required: true,
+      required: true,
     },
   },
   {

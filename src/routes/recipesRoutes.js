@@ -8,6 +8,9 @@ import {
   updateRecipe,
   addRecipeImage,
   deleteRecipe,
+  getFavorites,
+  addToFavorites,
+  removeFromFavorites,
 } from '../controllers/recipesController.js';
 import {
   createRecipeSchema,
@@ -33,7 +36,7 @@ router.get(
 );
 router.post('/me/recipes', celebrate(createRecipeSchema), createRecipe);
 router.patch(
-  '/me/recipes/:recipeId',
+  '/me/recipes/update/:recipeId',
   celebrate(updateRecipeSchema),
   updateRecipe,
 );
@@ -44,8 +47,9 @@ router.patch(
   addRecipeImage,
 );
 
-// router.patch('/me/favorite/recipes', celebrate(updateRecipeSchema), addToFavoriteRecipes);
-// router.get('/me/favorite/recipes', celebrate(updateRecipeSchema), getFromFavoriteRecipes);
+router.get('/favorites', authenticate, getFavorites);
+router.post('/favorites/:recipeId', authenticate, addToFavorites);
+router.delete('/favorites/:recipeId', authenticate, removeFromFavorites);
 
 router.delete(
   '/me/recipes/delete/:recipeId',
