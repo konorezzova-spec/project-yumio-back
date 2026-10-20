@@ -23,6 +23,8 @@ export const updateUser = async (req, res) => {
     { name },
     { new: true, runValidators: true },
   );
+  //   new: true	Повертає документ після оновлення, а не до нього.
+  // runValidators: true	Запускає валідатори схеми Mongoose для полів, які оновлюються.
 
   if (!updateUser) {
     throw createHttpError(204, 'User not found');
@@ -37,7 +39,7 @@ export const updateUserAvatar = async (req, res) => {
     throw createHttpError(400, 'No file');
   }
 
-  const result = await saveFileToCloudinary(file.buffer, user._id);
+  const result = await saveFileToCloudinary(file.buffer, user._id, 'avatar');
 
   const updatedUser = await User.findOneAndUpdate(
     { _id: user._id },

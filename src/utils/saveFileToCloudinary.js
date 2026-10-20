@@ -7,10 +7,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function saveFileToCloudinary(buffer, userId) {
+export async function saveFileToCloudinary(buffer, userId, folder) {
   const options = {
-    folder: 'yumio-app/avatars',
-    public_id: `avatar_${userId}`,
+    folder: `yumio-app/${folder}s`,
+    public_id: `${folder}_${userId}`,
     resource_type: 'image',
     overwrite: true,
     unique_filename: false,

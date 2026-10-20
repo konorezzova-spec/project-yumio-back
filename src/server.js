@@ -3,6 +3,7 @@ import 'dotenv/config';
 import cors from 'cors';
 
 import { connectMongoDB } from './db/connectToMongoDB.js';
+import { loadValidationData } from './utils/validationData.js';
 import { logger } from './middlewares/logger.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -40,6 +41,7 @@ app.use(errors());
 app.use(errorHandler);
 
 await connectMongoDB();
+await loadValidationData();
 
 // Запуск сервера
 app.listen(PORT, () => {
