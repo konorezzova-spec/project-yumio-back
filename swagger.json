@@ -15,7 +15,7 @@
   "servers": [
     {
       "url": "https://project-yumio-back.onrender.com",
-      "description": "Local development server"
+      "description": "Production server"
     }
   ],
   "tags": [
