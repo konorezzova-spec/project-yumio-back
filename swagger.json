@@ -1,0 +1,1807 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Yumio API",
+    "version": "1.0.0",
+    "description": "REST API for the **Yumio** recipe application.\n\nThe API is mounted under the `/api` prefix. Authentication is session based: `/api/auth/register`, `/api/auth/login` and `/api/auth/refresh` set three `httpOnly` cookies (`sessionId`, `accessToken`, `refreshToken`) that must be sent with every subsequent request.\n\n- `sessionId` + `accessToken` authenticate requests to protected endpoints (`accessToken` lives for 15 minutes).\n- `sessionId` + `refreshToken` are used by `POST /api/auth/refresh` to rotate the session (`refreshToken` lives for 24 hours).\n\nRequest payloads are validated with [celebrate](https://github.com/arb/celebrate) / Joi. A failed validation returns `400` with a `validation` object describing the offending segment (`body`, `query`, `params`) and the invalid keys.",
+    "contact": {
+      "name": "project-yumio-back",
+      "url": "https://github.com/konorezzova-spec/project-yumio-back"
+    },
+    "license": {
+      "name": "ISC"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://project-yumio-back.onrender.com",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Registration, login, logout and session refresh. Sets and consumes the session cookies."
+    },
+    {
+      "name": "Users",
+      "description": "Profile of the currently authenticated user."
+    },
+    {
+      "name": "Recipes",
+      "description": "Public recipe catalogue and CRUD operations for the recipes owned by the authenticated user."
+    },
+    {
+      "name": "Favorites",
+      "description": "Favourites list of the authenticated user."
+    },
+    {
+      "name": "Categories",
+      "description": "Reference data: recipe categories."
+    },
+    {
+      "name": "Ingredients",
+      "description": "Reference data: ingredients catalogue."
+    },
+    {
+      "name": "Documentation",
+      "description": "Machine readable description of this API."
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "description": "Creates a user, hashes the password with bcrypt (10 rounds) and starts a session. On success the `sessionId`, `accessToken` and `refreshToken` cookies are set and the created user (without the password) is returned.",
+        "operationId": "registerUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The user has been created and a session has been started.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Sets the `sessionId`, `accessToken` and `refreshToken` cookies (`httpOnly`, `secure`, `sameSite=none`).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The email is already registered, or the request body failed Joi validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/Error" },
+                    { "$ref": "#/components/schemas/ValidationError" }
+                  ]
+                },
+                "examples": {
+                  "emailInUse": {
+                    "summary": "Email is already in use",
+                    "value": {
+                      "message": "Email in use"
+                    }
+                  },
+                  "validationFailed": {
+                    "summary": "Body validation failed",
+                    "value": {
+                      "statusCode": 400,
+                      "error": "Bad Request",
+                      "message": "Validation failed",
+                      "validation": {
+                        "body": {
+                          "source": "body",
+                          "keys": ["password"],
+                          "message": "Password must be at least 8 characters long"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log in an existing user",
+        "description": "Looks the user up by email and compares the password with the stored bcrypt hash. The previous session of the user is deleted and a new one is created, so the cookies issued by the previous login stop working.",
+        "operationId": "loginUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user has been authenticated and a new session has been started.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Sets the `sessionId`, `accessToken` and `refreshToken` cookies (`httpOnly`, `secure`, `sameSite=none`).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log out the current user",
+        "description": "Deletes the session referenced by the `sessionId` cookie and clears the `sessionId`, `accessToken` and `refreshToken` cookies. The endpoint does not fail when no session cookie is present.",
+        "operationId": "logoutUser",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "204": {
+            "description": "The session has been terminated and the cookies cleared. No response body is returned."
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh the session",
+        "description": "Validates the `sessionId` + `refreshToken` cookie pair. If the refresh token is still valid the current session is rotated (deleted) and a new one is created with fresh `sessionId`, `accessToken` and `refreshToken` cookies. If the refresh token has expired the session is deleted and the cookies are cleared.",
+        "operationId": "refreshUserSession",
+        "security": [{ "sessionCookie": [], "refreshTokenCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "The session has been refreshed.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Replaces the `sessionId`, `accessToken` and `refreshToken` cookies with a new session.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "Session refreshed"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get the current user profile",
+        "description": "Returns the profile of the user bound to the session cookies. The password is stripped from the response by the `toJSON` method of the user schema.",
+        "operationId": "getUser",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "The profile of the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/users/me/update": {
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Update the current user profile",
+        "description": "Updates the name of the authenticated user. The endpoint is not covered by a celebrate schema, so the body shape below is derived from the Mongoose user model and from the constraints applied to the same field during registration.",
+        "operationId": "updateUser",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 16,
+                    "description": "New display name. Trimmed by the Mongoose schema.",
+                    "example": "Alice"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated profile of the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "The user could not be found. The handler throws an `HttpError` with status `204`, therefore the response body is stripped by Express."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/users/me/avatar": {
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Upload a new user avatar",
+        "description": "Uploads a single image for the authenticated user, stores it in Cloudinary (folder `yumio-app/avatars`, 500x500 crop) and updates the `avatar` field of the user. The previous avatar is overwritten.",
+        "operationId": "updateUserAvatar",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "avatar": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file. Allowed MIME types: `image/jpeg`, `image/jpg`, `image/png`, `image/gif`, `image/webp`. Maximum size 2 MB."
+                  }
+                },
+                "required": ["avatar"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The avatar has been uploaded and the new URL is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                },
+                "example": {
+                  "url": "https://res.cloudinary.com/yumio/image/upload/v1/yumio-app/avatars/avatar_65f1c2a4b3c2d1e0f1a2b3c4.jpg"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "List all recipe categories",
+        "description": "Returns every category stored in the database. The same list is used to build the `category` enum of the recipe schemas.",
+        "operationId": "getCategories",
+        "responses": {
+          "200": {
+            "description": "The list of categories.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Category"
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "65f1c2a4b3c2d1e0f1a2b3c4",
+                    "name": "Dessert"
+                  }
+                ]
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/ingredients": {
+      "get": {
+        "tags": ["Ingredients"],
+        "summary": "List all ingredients",
+        "description": "Returns every ingredient stored in the database. The `_id` of an ingredient is a human readable slug, not a MongoDB ObjectId, and is referenced by `ingredients[].id` of a recipe.",
+        "operationId": "getIngredients",
+        "responses": {
+          "200": {
+            "description": "The list of ingredients.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ingredient"
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "5c8e1a2b3c4d5e6f7a8b9c0d",
+                    "name": "Tomato",
+                    "desc": "Fresh ripe tomatoes",
+                    "img": "https://res.cloudinary.com/yumio/image/upload/tomato.jpg"
+                  }
+                ]
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/recipes": {
+      "get": {
+        "tags": ["Recipes"],
+        "summary": "List all recipes",
+        "description": "Returns a paginated list of recipes. The list can be filtered by `category` and searched by `search` (case-insensitive, matched against `title` and `description`).",
+        "operationId": "getRecipes",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "$ref": "#/components/parameters/CategoryQuery" },
+          { "$ref": "#/components/parameters/SearchQuery" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of recipes together with the pagination metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/recipes/{recipeId}": {
+      "get": {
+        "tags": ["Recipes"],
+        "summary": "Get a single recipe",
+        "description": "Returns the recipe with the given id. The endpoint is public.",
+        "operationId": "getRecipeById",
+        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "responses": {
+          "200": {
+            "description": "The requested recipe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/me/recipes": {
+      "get": {
+        "tags": ["Recipes"],
+        "summary": "List the recipes of the authenticated user",
+        "description": "Same contract as `GET /api/recipes`, but restricted to the recipes owned by the authenticated user.",
+        "operationId": "getMyRecipes",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "$ref": "#/components/parameters/CategoryQuery" },
+          { "$ref": "#/components/parameters/SearchQuery" }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the recipes owned by the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Recipes"],
+        "summary": "Create a recipe",
+        "description": "Creates a recipe owned by the authenticated user. The `owner` field is taken from the session and cannot be set by the client.",
+        "operationId": "createRecipe",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecipeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created recipe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/me/recipes/{recipeId}": {
+      "get": {
+        "tags": ["Recipes"],
+        "summary": "Get one of the recipes of the authenticated user",
+        "description": "Returns the recipe with the given id. The endpoint is protected by the session middleware that is mounted on the whole `/api/me/recipes` prefix.",
+        "operationId": "getMyRecipeById",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "responses": {
+          "200": {
+            "description": "The requested recipe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/me/recipes/update/{recipeId}": {
+      "patch": {
+        "tags": ["Recipes"],
+        "summary": "Update a recipe of the authenticated user",
+        "description": "Partially updates a recipe. Only recipes owned by the authenticated user can be updated. The body must contain at least one field.",
+        "operationId": "updateRecipe",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRecipeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated recipe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/me/recipes/addimage/{recipeId}": {
+      "patch": {
+        "tags": ["Recipes"],
+        "summary": "Upload the image of a recipe",
+        "description": "Uploads a single image for the recipe, stores it in Cloudinary (folder `yumio-app/recipes`, 500x500 crop) and writes the resulting URL to the `thumb` field. The previous image is overwritten.",
+        "operationId": "addRecipeImage",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipe": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file. Allowed MIME types: `image/jpeg`, `image/jpg`, `image/png`, `image/gif`, `image/webp`. Maximum size 2 MB."
+                  }
+                },
+                "required": ["recipe"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The recipe with the updated `thumb` field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file was sent, or the `recipeId` path parameter failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/Error" },
+                    { "$ref": "#/components/schemas/ValidationError" }
+                  ]
+                },
+                "examples": {
+                  "noFile": {
+                    "summary": "No file in the request",
+                    "value": {
+                      "message": "No file"
+                    }
+                  },
+                  "validationFailed": {
+                    "summary": "Invalid recipe id",
+                    "value": {
+                      "statusCode": 400,
+                      "error": "Bad Request",
+                      "message": "Validation failed",
+                      "validation": {
+                        "params": {
+                          "source": "params",
+                          "keys": ["recipeId"],
+                          "message": "Invalid id format"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/me/recipes/delete/{recipeId}": {
+      "delete": {
+        "tags": ["Recipes"],
+        "summary": "Delete a recipe of the authenticated user",
+        "description": "Deletes the recipe and removes it from the favourites of every user that had it bookmarked. Only the owner can delete the recipe.",
+        "operationId": "deleteRecipe",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "responses": {
+          "200": {
+            "description": "The deleted recipe document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/favorites": {
+      "get": {
+        "tags": ["Favorites"],
+        "summary": "List the favourite recipes of the authenticated user",
+        "description": "Returns the favourite recipes of the authenticated user. The references are populated, so the full recipe documents are returned instead of the ids.",
+        "operationId": "getFavorites",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "The list of favourite recipes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Recipe"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/favorites/{recipeId}": {
+      "post": {
+        "tags": ["Favorites"],
+        "summary": "Add a recipe to the favourites",
+        "description": "Adds the recipe to the favourites of the authenticated user. Adding a recipe that is already a favourite does not create a duplicate.",
+        "operationId": "addToFavorites",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/FavoriteRecipeId" }],
+        "responses": {
+          "200": {
+            "description": "The recipe has been added to the favourites.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoritesResponse"
+                },
+                "example": {
+                  "message": "Recipe added to favorites",
+                  "favorites": ["65f1c2a4b3c2d1e0f1a2b3c4"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Favorites"],
+        "summary": "Remove a recipe from the favourites",
+        "description": "Removes the recipe from the favourites of the authenticated user. The operation is idempotent: removing a recipe that is not a favourite is not an error.",
+        "operationId": "removeFromFavorites",
+        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/FavoriteRecipeId" }],
+        "responses": {
+          "200": {
+            "description": "The recipe has been removed from the favourites.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoritesResponse"
+                },
+                "example": {
+                  "message": "Recipe removed from favorites",
+                  "favorites": []
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api-docs": {
+      "get": {
+        "tags": ["Documentation"],
+        "summary": "Swagger UI",
+        "description": "Interactive documentation of the API. The raw OpenAPI document is available at `GET /api-docs.json`.",
+        "operationId": "getApiDocs",
+        "responses": {
+          "200": {
+            "description": "The Swagger UI page.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api-docs.json": {
+      "get": {
+        "tags": ["Documentation"],
+        "summary": "OpenAPI document",
+        "description": "The OpenAPI 3.0 description of this API. The `category` and `area` enums are refreshed from the database on every request.",
+        "operationId": "getApiDocsJson",
+        "responses": {
+          "200": {
+            "description": "The OpenAPI document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionId",
+        "description": "Id of the session stored in the database. Set by `/api/auth/register`, `/api/auth/login` and `/api/auth/refresh`."
+      },
+      "accessTokenCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "accessToken",
+        "description": "Access token of the session. Valid for 15 minutes after it has been issued."
+      },
+      "refreshTokenCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "refreshToken",
+        "description": "Refresh token of the session. Valid for 24 hours after it has been issued. Used only by `POST /api/auth/refresh`."
+      }
+    },
+    "parameters": {
+      "RecipeId": {
+        "name": "recipeId",
+        "in": "path",
+        "required": true,
+        "description": "Id of the recipe. Validated with the `isValidObjectId` check of Mongoose, so it has to be a 24 character hexadecimal string.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{24}$",
+          "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+        }
+      },
+      "FavoriteRecipeId": {
+        "name": "recipeId",
+        "in": "path",
+        "required": true,
+        "description": "Id of the recipe. The favourites endpoints are not covered by a celebrate schema, but the id is still used as a MongoDB ObjectId, so it has to be a 24 character hexadecimal string.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{24}$",
+          "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+        }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Number of the page to return. Falls back to `1` when it is not provided.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "example": 1
+        }
+      },
+      "PerPage": {
+        "name": "perPage",
+        "in": "query",
+        "required": false,
+        "description": "Number of recipes per page. Falls back to `10` when it is not provided.",
+        "schema": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 20,
+          "default": 10,
+          "example": 10
+        }
+      },
+      "CategoryQuery": {
+        "name": "category",
+        "in": "query",
+        "required": false,
+        "description": "Returns only the recipes of the given category. The allowed values are loaded from the database when the server starts.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "Seafood",
+            "Lamb",
+            "Starter",
+            "Chicken",
+            "Beef",
+            "Dessert",
+            "Vegan",
+            "Pork",
+            "Vegetarian",
+            "Miscellaneous",
+            "Pasta",
+            "Breakfast",
+            "Side",
+            "Goat",
+            "Soup"
+          ],
+          "x-dynamic-enum": "CATEGORY_NAMES"
+        }
+      },
+      "SearchQuery": {
+        "name": "search",
+        "in": "query",
+        "required": false,
+        "description": "Case-insensitive search across the `title` and the `description` of the recipes. The value is trimmed and may be empty.",
+        "schema": {
+          "type": "string",
+          "allowEmptyValue": true,
+          "example": "pasta"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The request could not be processed.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "message": "No file"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Authentication failed. The session cookies are missing, unknown or expired.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "missingCredentials": {
+                "summary": "Session cookies are missing",
+                "value": {
+                  "message": "Missing session credentials"
+                }
+              },
+              "sessionNotFound": {
+                "summary": "The session does not exist anymore",
+                "value": {
+                  "message": "Session not found"
+                }
+              },
+              "accessTokenExpired": {
+                "summary": "The access token has expired",
+                "value": {
+                  "message": "Access token expired"
+                }
+              },
+              "userNotFound": {
+                "summary": "The user of the session does not exist anymore",
+                "value": {
+                  "message": "User not found"
+                }
+              },
+              "invalidCredentials": {
+                "summary": "The email or the password is wrong",
+                "value": {
+                  "message": "Invalid credentials"
+                }
+              },
+              "refreshTokenExpired": {
+                "summary": "The refresh token has expired",
+                "value": {
+                  "message": "Session token expired"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "The requested resource does not exist.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "recipeNotFound": {
+                "summary": "Recipe not found",
+                "value": {
+                  "message": "Recipe not found"
+                }
+              },
+              "userNotFound": {
+                "summary": "User not found",
+                "value": {
+                  "message": "User not found"
+                }
+              },
+              "routeNotFound": {
+                "summary": "The route does not exist",
+                "value": {
+                  "message": "Route not found"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ValidationFailed": {
+        "description": "The request failed the Joi validation performed by celebrate.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "example": {
+              "statusCode": 400,
+              "error": "Bad Request",
+              "message": "Validation failed",
+              "validation": {
+                "query": {
+                  "source": "query",
+                  "keys": ["perPage"],
+                  "message": "\"perPage\" must be less than or equal to 20"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "An unexpected error occurred while processing the request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "message": "Something went wrong. Please try again later."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "description": "A registered user. The `password` field is removed from the payload by the `toJSON` method of the Mongoose user schema.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Id of the user (MongoDB ObjectId).",
+            "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "example": "Alice"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 128,
+            "example": "alice@example.com"
+          },
+          "avatar": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the avatar. Replaced by the uploaded image once `PATCH /api/users/me/avatar` has been called.",
+            "default": "https://ac.goit.global/fullstack/react/default-avatar.jpg"
+          },
+          "favorites": {
+            "type": "array",
+            "description": "Ids of the recipes bookmarked by the user.",
+            "items": {
+              "type": "string",
+              "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "__v": {
+            "type": "integer",
+            "description": "Version key maintained by Mongoose."
+          }
+        },
+        "required": [
+          "_id",
+          "name",
+          "email",
+          "avatar",
+          "favorites",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "RegisterUserRequest": {
+        "type": "object",
+        "description": "Payload of `POST /api/auth/register`. Mirrors the `registerUserSchema` Joi schema.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "example": "Alice"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 128,
+            "example": "alice@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "maxLength": 128,
+            "example": "Pa$$w0rd"
+          }
+        },
+        "required": ["name", "email", "password"],
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Payload of `POST /api/auth/login`. Mirrors the `loginUserSchema` Joi schema.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "example": "Alice"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "alice@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "Pa$$w0rd"
+          }
+        },
+        "required": ["name", "email", "password"],
+        "additionalProperties": false
+      },
+      "RecipeIngredientInput": {
+        "type": "object",
+        "description": "An ingredient used in a recipe. Mirrors the `ingredients.items` Joi schema.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "Id of the ingredient taken from `GET /api/ingredients`.",
+            "example": "5c8e1a2b3c"
+          },
+          "measure": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "Amount of the ingredient needed for the recipe.",
+            "example": "200g"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecipeIngredient": {
+        "type": "object",
+        "description": "An ingredient stored inside a recipe document.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Id of the sub-document. It is generated by Mongoose when the recipe is created."
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "5c8e1a2b3c"
+          },
+          "measure": {
+            "type": "string",
+            "maxLength": 10,
+            "example": "200g"
+          }
+        },
+        "required": ["id", "measure"]
+      },
+      "CreateRecipeRequest": {
+        "type": "object",
+        "description": "Payload of `POST /api/me/recipes`. Mirrors the `createRecipeSchema` Joi schema.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "example": "Pasta with tomato sauce"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the recipe. The allowed values are loaded from the database when the server starts.",
+            "enum": [
+              "Seafood",
+              "Lamb",
+              "Starter",
+              "Chicken",
+              "Beef",
+              "Dessert",
+              "Vegan",
+              "Pork",
+              "Vegetarian",
+              "Miscellaneous",
+              "Pasta",
+              "Breakfast",
+              "Side",
+              "Goat",
+              "Soup"
+            ],
+            "x-dynamic-enum": "CATEGORY_NAMES"
+          },
+          "area": {
+            "type": "string",
+            "description": "Cuisine of the recipe. The allowed values are loaded from the database when the server starts.",
+            "enum": [
+              "Ukrainian",
+              "Italian",
+              "Moroccan",
+              "Unknown",
+              "Thai",
+              "Irish",
+              "British",
+              "Japanese",
+              "French",
+              "Indian",
+              "American",
+              "Mexican",
+              "Malaysian",
+              "Dutch",
+              "Spanish",
+              "Canadian",
+              "Vietnamese",
+              "Tunisian",
+              "Greek",
+              "Portuguese",
+              "Croatian",
+              "Chinese",
+              "Egyptian",
+              "Jamaican",
+              "Polish",
+              "Kenyan",
+              "Turkish"
+            ],
+            "x-dynamic-enum": "AREA_NAMES"
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 1200,
+            "example": "Boil the pasta for 8 minutes, then add the sauce."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "example": "A simple Italian pasta dish."
+          },
+          "time": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 360,
+            "description": "Preparation time in minutes.",
+            "example": 25
+          },
+          "ingredients": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/components/schemas/RecipeIngredientInput"
+            }
+          }
+        },
+        "required": [
+          "title",
+          "category",
+          "area",
+          "instructions",
+          "description",
+          "time",
+          "ingredients"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateRecipeRequest": {
+        "type": "object",
+        "description": "Payload of `PATCH /api/me/recipes/update/{recipeId}`. Mirrors the `updateRecipeSchema` Joi schema: every field is optional, but the body must contain at least one property.",
+        "minProperties": 1,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "example": "Pasta with tomato sauce"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the recipe. The allowed values are loaded from the database when the server starts.",
+            "enum": [
+              "Seafood",
+              "Lamb",
+              "Starter",
+              "Chicken",
+              "Beef",
+              "Dessert",
+              "Vegan",
+              "Pork",
+              "Vegetarian",
+              "Miscellaneous",
+              "Pasta",
+              "Breakfast",
+              "Side",
+              "Goat",
+              "Soup"
+            ],
+            "x-dynamic-enum": "CATEGORY_NAMES"
+          },
+          "area": {
+            "type": "string",
+            "description": "Cuisine of the recipe. The allowed values are loaded from the database when the server starts.",
+            "enum": [
+              "Ukrainian",
+              "Italian",
+              "Moroccan",
+              "Unknown",
+              "Thai",
+              "Irish",
+              "British",
+              "Japanese",
+              "French",
+              "Indian",
+              "American",
+              "Mexican",
+              "Malaysian",
+              "Dutch",
+              "Spanish",
+              "Canadian",
+              "Vietnamese",
+              "Tunisian",
+              "Greek",
+              "Portuguese",
+              "Croatian",
+              "Chinese",
+              "Egyptian",
+              "Jamaican",
+              "Polish",
+              "Kenyan",
+              "Turkish"
+            ],
+            "x-dynamic-enum": "AREA_NAMES"
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "time": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 360
+          },
+          "ingredients": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/components/schemas/RecipeIngredientInput"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Recipe": {
+        "type": "object",
+        "description": "A recipe document stored in MongoDB.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Id of the recipe (MongoDB ObjectId).",
+            "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "example": "Pasta with tomato sauce"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category of the recipe. The allowed values are loaded from the database when the server starts.",
+            "enum": [
+              "Seafood",
+              "Lamb",
+              "Starter",
+              "Chicken",
+              "Beef",
+              "Dessert",
+              "Vegan",
+              "Pork",
+              "Vegetarian",
+              "Miscellaneous",
+              "Pasta",
+              "Breakfast",
+              "Side",
+              "Goat",
+              "Soup"
+            ],
+            "x-dynamic-enum": "CATEGORY_NAMES"
+          },
+          "owner": {
+            "type": "string",
+            "description": "Id of the user who owns the recipe.",
+            "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+          },
+          "area": {
+            "type": "string",
+            "description": "Cuisine of the recipe. The allowed values are loaded from the database when the server starts.",
+            "enum": [
+              "Ukrainian",
+              "Italian",
+              "Moroccan",
+              "Unknown",
+              "Thai",
+              "Irish",
+              "British",
+              "Japanese",
+              "French",
+              "Indian",
+              "American",
+              "Mexican",
+              "Malaysian",
+              "Dutch",
+              "Spanish",
+              "Canadian",
+              "Vietnamese",
+              "Tunisian",
+              "Greek",
+              "Portuguese",
+              "Croatian",
+              "Chinese",
+              "Egyptian",
+              "Jamaican",
+              "Polish",
+              "Kenyan",
+              "Turkish"
+            ],
+            "x-dynamic-enum": "AREA_NAMES"
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "thumb": {
+            "type": "string",
+            "description": "URL of the recipe image. Absent until an image has been uploaded with `PATCH /api/me/recipes/addimage/{recipeId}`."
+          },
+          "time": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 360,
+            "description": "Preparation time in minutes.",
+            "example": 25
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeIngredient"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "__v": {
+            "type": "integer",
+            "description": "Version key maintained by Mongoose."
+          }
+        },
+        "required": [
+          "_id",
+          "title",
+          "category",
+          "owner",
+          "area",
+          "instructions",
+          "description",
+          "time",
+          "ingredients",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "RecipeListResponse": {
+        "type": "object",
+        "description": "A page of recipes together with the pagination metadata.",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "example": 10
+          },
+          "totalItems": {
+            "type": "integer",
+            "description": "Total number of recipes matching the filter.",
+            "example": 42
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          },
+          "recipes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Recipe"
+            }
+          }
+        },
+        "required": ["page", "perPage", "totalItems", "totalPages", "recipes"]
+      },
+      "Category": {
+        "type": "object",
+        "description": "A recipe category.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Id of the category (MongoDB ObjectId).",
+            "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+          },
+          "name": {
+            "type": "string",
+            "example": "Dessert"
+          }
+        },
+        "required": ["_id", "name"]
+      },
+      "Ingredient": {
+        "type": "object",
+        "description": "An ingredient of the catalogue.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Id of the ingredient. It is a slug, not a MongoDB ObjectId.",
+            "example": "5c8e1a2b3c"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tomato"
+          },
+          "desc": {
+            "type": "string",
+            "description": "Short description of the ingredient.",
+            "example": "Fresh ripe tomatoes"
+          },
+          "img": {
+            "type": "string",
+            "description": "URL of the image of the ingredient.",
+            "example": "https://res.cloudinary.com/yumio/image/upload/tomato.jpg"
+          }
+        },
+        "required": ["_id", "name"]
+      },
+      "Area": {
+        "type": "object",
+        "description": "A cuisine area.",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Id of the area (MongoDB ObjectId).",
+            "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+          },
+          "name": {
+            "type": "string",
+            "example": "Italian"
+          }
+        },
+        "required": ["_id", "name"]
+      },
+      "FavoritesResponse": {
+        "type": "object",
+        "description": "Result of adding or removing a recipe from the favourites.",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Recipe added to favorites"
+          },
+          "favorites": {
+            "type": "array",
+            "description": "Ids of the recipes that are currently bookmarked by the user.",
+            "items": {
+              "type": "string",
+              "example": "65f1c2a4b3c2d1e0f1a2b3c4"
+            }
+          }
+        },
+        "required": ["message", "favorites"]
+      },
+      "AvatarResponse": {
+        "type": "object",
+        "description": "Result of the avatar upload.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the stored avatar.",
+            "example": "https://res.cloudinary.com/yumio/image/upload/v1/yumio-app/avatars/avatar_65f1c2a4b3c2d1e0f1a2b3c4.jpg"
+          }
+        },
+        "required": ["url"]
+      },
+      "MessageResponse": {
+        "type": "object",
+        "description": "A plain message returned by the API.",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Session refreshed"
+          }
+        },
+        "required": ["message"]
+      },
+      "Error": {
+        "type": "object",
+        "description": "Error returned by the error handler of the application. `http-errors` instances keep their status code and message, any other error is reported as an internal server error.",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Recipe not found"
+          }
+        },
+        "required": ["message"]
+      },
+      "ValidationError": {
+        "type": "object",
+        "description": "Error returned by the celebrate error handler when the Joi validation of a request segment fails.",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "example": 400
+          },
+          "error": {
+            "type": "string",
+            "example": "Bad Request"
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "validation": {
+            "type": "object",
+            "description": "Validation details, keyed by the request segment that failed (`body`, `query`, `params`).",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "The request segment that failed.",
+                  "enum": ["body", "query", "params", "headers", "cookies"]
+                },
+                "keys": {
+                  "type": "array",
+                  "description": "Paths of the invalid fields.",
+                  "items": {
+                    "type": "string",
+                    "example": "recipeId"
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The Joi error message.",
+                  "example": "Invalid id format"
+                }
+              },
+              "required": ["source", "keys", "message"]
+            }
+          }
+        },
+        "required": ["statusCode", "error", "message", "validation"]
+      }
+    }
+  }
+}

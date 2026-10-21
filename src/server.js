@@ -12,6 +12,7 @@ import usersRoutes from './routes/usersRoutes.js';
 import categoriesRoutes from './routes/categoriesRoutes.js';
 import ingredientsRoutes from './routes/ingredientsRoutes.js';
 import recipesRoutes from './routes/recipesRoutes.js';
+import docsRoutes from './routes/docsRoutes.js';
 import { errors } from 'celebrate';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -25,6 +26,9 @@ app.use(helmet()); // Захист HTTP-заголовків
 app.use(express.json()); // Парсинг JSON-тіла
 app.use(cors()); // Дозвіл для запитів з інших доменів
 app.use(cookieParser()); // Парсинг cookie
+
+// Swagger UI та OpenAPI-документ (/api-docs, /api-docs.json)
+app.use(docsRoutes);
 
 // підключаємо групу маршрутів
 app.use('/api', authRoutes);
