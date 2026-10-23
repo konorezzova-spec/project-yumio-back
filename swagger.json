@@ -228,6 +228,100 @@
         }
       }
     },
+    "/api/auth/request-reset-email": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request a password reset email",
+        "description": "Sends a password reset email if an account with the provided email exists. For security reasons the response is identical whether the user exists or not (anti user enumeration). The email contains a short-lived JWT reset token (15 minutes) that must be passed to `POST /api/auth/reset-password`.",
+        "operationId": "requestResetEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestResetEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request has been processed. A reset email may be sent if the account exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "If this email exists, a reset link has been sent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reset the password",
+        "description": "Verifies the reset token (JWT, 15 minutes) and sets a new password for the user. All existing sessions for that user are invalidated. The user must log in again after a successful reset.",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The password has been reset successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                },
+                "example": {
+                  "message": "Password reset successfully. Please log in again."
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "401": {
+            "description": "The reset token is invalid or has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "message": "Invalid or expired token"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
     "/api/users/me": {
       "get": {
         "tags": ["Users"],
@@ -1184,10 +1278,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "__v": {
-            "type": "integer",
-            "description": "Version key maintained by Mongoose."
           }
         },
         "required": [
@@ -1249,6 +1339,38 @@
           }
         },
         "required": ["name", "email", "password"],
+        "additionalProperties": false
+      },
+      "RequestResetEmailRequest": {
+        "type": "object",
+        "description": "Payload of `POST /api/auth/request-reset-email`. Mirrors the `requestResetEmailSchema` Joi schema.",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "alice@example.com"
+          }
+        },
+        "required": ["email"],
+        "additionalProperties": false
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "description": "Payload of `POST /api/auth/reset-password`. Mirrors the `resetPasswordSchema` Joi schema.",
+        "properties": {
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "example": "NewP@ssw0rd"
+          },
+          "token": {
+            "type": "string",
+            "description": "Password reset token sent by email.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        },
+        "required": ["password", "token"],
         "additionalProperties": false
       },
       "RecipeIngredientInput": {
@@ -1593,10 +1715,6 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "__v": {
-            "type": "integer",
-            "description": "Version key maintained by Mongoose."
           }
         },
         "required": [
