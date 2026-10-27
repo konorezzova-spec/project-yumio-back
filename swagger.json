@@ -51,7 +51,9 @@
   "paths": {
     "/api/auth/register": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Register a new user",
         "description": "Creates a user, hashes the password with bcrypt (10 rounds) and starts a session. On success the `sessionId`, `accessToken` and `refreshToken` cookies are set and the created user (without the password) is returned.",
         "operationId": "registerUser",
@@ -90,8 +92,12 @@
               "application/json": {
                 "schema": {
                   "oneOf": [
-                    { "$ref": "#/components/schemas/Error" },
-                    { "$ref": "#/components/schemas/ValidationError" }
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    }
                   ]
                 },
                 "examples": {
@@ -110,7 +116,9 @@
                       "validation": {
                         "body": {
                           "source": "body",
-                          "keys": ["password"],
+                          "keys": [
+                            "password"
+                          ],
                           "message": "Password must be at least 8 characters long"
                         }
                       }
@@ -128,7 +136,9 @@
     },
     "/api/auth/login": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Log in an existing user",
         "description": "Looks the user up by email and compares the password with the stored bcrypt hash. The previous session of the user is deleted and a new one is created, so the cookies issued by the previous login stop working.",
         "operationId": "loginUser",
@@ -175,11 +185,17 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Log out the current user",
         "description": "Deletes the session referenced by the `sessionId` cookie and clears the `sessionId`, `accessToken` and `refreshToken` cookies. The endpoint does not fail when no session cookie is present.",
         "operationId": "logoutUser",
-        "security": [{ "sessionCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "204": {
             "description": "The session has been terminated and the cookies cleared. No response body is returned."
@@ -192,11 +208,18 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Refresh the session",
         "description": "Validates the `sessionId` + `refreshToken` cookie pair. If the refresh token is still valid the current session is rotated (deleted) and a new one is created with fresh `sessionId`, `accessToken` and `refreshToken` cookies. If the refresh token has expired the session is deleted and the cookies are cleared.",
         "operationId": "refreshUserSession",
-        "security": [{ "sessionCookie": [], "refreshTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "refreshTokenCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "The session has been refreshed.",
@@ -230,7 +253,9 @@
     },
     "/api/auth/request-reset-email": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Request a password reset email",
         "description": "Sends a password reset email if an account with the provided email exists. For security reasons the response is identical whether the user exists or not (anti user enumeration). The email contains a short-lived JWT reset token (15 minutes) that must be passed to `POST /api/auth/reset-password`.",
         "operationId": "requestResetEmail",
@@ -269,7 +294,9 @@
     },
     "/api/auth/reset-password": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Reset the password",
         "description": "Verifies the reset token (JWT, 15 minutes) and sets a new password for the user. All existing sessions for that user are invalidated. The user must log in again after a successful reset.",
         "operationId": "resetPassword",
@@ -324,11 +351,18 @@
     },
     "/api/users/me": {
       "get": {
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "summary": "Get the current user profile",
         "description": "Returns the profile of the user bound to the session cookies. The password is stripped from the response by the `toJSON` method of the user schema.",
         "operationId": "getUser",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "The profile of the authenticated user.",
@@ -354,11 +388,18 @@
     },
     "/api/users/me/update": {
       "patch": {
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "summary": "Update the current user profile",
         "description": "Updates the name of the authenticated user. The endpoint is not covered by a celebrate schema, so the body shape below is derived from the Mongoose user model and from the constraints applied to the same field during registration.",
         "operationId": "updateUser",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -403,11 +444,18 @@
     },
     "/api/users/me/avatar": {
       "patch": {
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "summary": "Upload a new user avatar",
         "description": "Uploads a single image for the authenticated user, stores it in Cloudinary (folder `yumio-app/avatars`, 500x500 crop) and updates the `avatar` field of the user. The previous avatar is overwritten.",
         "operationId": "updateUserAvatar",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -421,7 +469,9 @@
                     "description": "Image file. Allowed MIME types: `image/jpeg`, `image/jpg`, `image/png`, `image/gif`, `image/webp`. Maximum size 2 MB."
                   }
                 },
-                "required": ["avatar"]
+                "required": [
+                  "avatar"
+                ]
               }
             }
           }
@@ -454,7 +504,9 @@
     },
     "/api/categories": {
       "get": {
-        "tags": ["Categories"],
+        "tags": [
+          "Categories"
+        ],
         "summary": "List all recipe categories",
         "description": "Returns every category stored in the database. The same list is used to build the `category` enum of the recipe schemas.",
         "operationId": "getCategories",
@@ -486,7 +538,9 @@
     },
     "/api/ingredients": {
       "get": {
-        "tags": ["Ingredients"],
+        "tags": [
+          "Ingredients"
+        ],
         "summary": "List all ingredients",
         "description": "Returns every ingredient stored in the database. The `_id` of an ingredient is a human readable slug, not a MongoDB ObjectId, and is referenced by `ingredients[].id` of a recipe.",
         "operationId": "getIngredients",
@@ -520,15 +574,25 @@
     },
     "/api/recipes": {
       "get": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "List all recipes",
         "description": "Returns a paginated list of recipes. The list can be filtered by `category` and searched by `search` (case-insensitive, matched against `title` and `description`).",
         "operationId": "getRecipes",
         "parameters": [
-          { "$ref": "#/components/parameters/Page" },
-          { "$ref": "#/components/parameters/PerPage" },
-          { "$ref": "#/components/parameters/CategoryQuery" },
-          { "$ref": "#/components/parameters/SearchQuery" }
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PerPage"
+          },
+          {
+            "$ref": "#/components/parameters/CategoryQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          }
         ],
         "responses": {
           "200": {
@@ -552,11 +616,17 @@
     },
     "/api/recipes/{recipeId}": {
       "get": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "Get a single recipe",
         "description": "Returns the recipe with the given id. The endpoint is public.",
         "operationId": "getRecipeById",
-        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RecipeId"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The requested recipe.",
@@ -582,16 +652,31 @@
     },
     "/api/me/recipes": {
       "get": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "List the recipes of the authenticated user",
         "description": "Same contract as `GET /api/recipes`, but restricted to the recipes owned by the authenticated user.",
         "operationId": "getMyRecipes",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
         "parameters": [
-          { "$ref": "#/components/parameters/Page" },
-          { "$ref": "#/components/parameters/PerPage" },
-          { "$ref": "#/components/parameters/CategoryQuery" },
-          { "$ref": "#/components/parameters/SearchQuery" }
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PerPage"
+          },
+          {
+            "$ref": "#/components/parameters/CategoryQuery"
+          },
+          {
+            "$ref": "#/components/parameters/SearchQuery"
+          }
         ],
         "responses": {
           "200": {
@@ -616,11 +701,18 @@
         }
       },
       "post": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "Create a recipe",
         "description": "Creates a recipe owned by the authenticated user. The `owner` field is taken from the session and cannot be set by the client.",
         "operationId": "createRecipe",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -656,12 +748,23 @@
     },
     "/api/me/recipes/{recipeId}": {
       "get": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "Get one of the recipes of the authenticated user",
         "description": "Returns the recipe with the given id. The endpoint is protected by the session middleware that is mounted on the whole `/api/me/recipes` prefix.",
         "operationId": "getMyRecipeById",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RecipeId"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The requested recipe.",
@@ -690,12 +793,23 @@
     },
     "/api/me/recipes/update/{recipeId}": {
       "patch": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "Update a recipe of the authenticated user",
         "description": "Partially updates a recipe. Only recipes owned by the authenticated user can be updated. The body must contain at least one field.",
         "operationId": "updateRecipe",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RecipeId"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -734,12 +848,23 @@
     },
     "/api/me/recipes/addimage/{recipeId}": {
       "patch": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "Upload the image of a recipe",
         "description": "Uploads a single image for the recipe, stores it in Cloudinary (folder `yumio-app/recipes`, 500x500 crop) and writes the resulting URL to the `thumb` field. The previous image is overwritten.",
         "operationId": "addRecipeImage",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RecipeId"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -753,7 +878,9 @@
                     "description": "Image file. Allowed MIME types: `image/jpeg`, `image/jpg`, `image/png`, `image/gif`, `image/webp`. Maximum size 2 MB."
                   }
                 },
-                "required": ["recipe"]
+                "required": [
+                  "recipe"
+                ]
               }
             }
           }
@@ -775,8 +902,12 @@
               "application/json": {
                 "schema": {
                   "oneOf": [
-                    { "$ref": "#/components/schemas/Error" },
-                    { "$ref": "#/components/schemas/ValidationError" }
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    }
                   ]
                 },
                 "examples": {
@@ -795,7 +926,9 @@
                       "validation": {
                         "params": {
                           "source": "params",
-                          "keys": ["recipeId"],
+                          "keys": [
+                            "recipeId"
+                          ],
                           "message": "Invalid id format"
                         }
                       }
@@ -819,12 +952,23 @@
     },
     "/api/me/recipes/delete/{recipeId}": {
       "delete": {
-        "tags": ["Recipes"],
+        "tags": [
+          "Recipes"
+        ],
         "summary": "Delete a recipe of the authenticated user",
         "description": "Deletes the recipe and removes it from the favourites of every user that had it bookmarked. Only the owner can delete the recipe.",
         "operationId": "deleteRecipe",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/RecipeId" }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RecipeId"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The deleted recipe document.",
@@ -853,11 +997,18 @@
     },
     "/api/favorites": {
       "get": {
-        "tags": ["Favorites"],
+        "tags": [
+          "Favorites"
+        ],
         "summary": "List the favourite recipes of the authenticated user",
         "description": "Returns the favourite recipes of the authenticated user. The references are populated, so the full recipe documents are returned instead of the ids.",
         "operationId": "getFavorites",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "The list of favourite recipes.",
@@ -886,12 +1037,23 @@
     },
     "/api/favorites/{recipeId}": {
       "post": {
-        "tags": ["Favorites"],
+        "tags": [
+          "Favorites"
+        ],
         "summary": "Add a recipe to the favourites",
         "description": "Adds the recipe to the favourites of the authenticated user. Adding a recipe that is already a favourite does not create a duplicate.",
         "operationId": "addToFavorites",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/FavoriteRecipeId" }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FavoriteRecipeId"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The recipe has been added to the favourites.",
@@ -902,7 +1064,9 @@
                 },
                 "example": {
                   "message": "Recipe added to favorites",
-                  "favorites": ["65f1c2a4b3c2d1e0f1a2b3c4"]
+                  "favorites": [
+                    "65f1c2a4b3c2d1e0f1a2b3c4"
+                  ]
                 }
               }
             }
@@ -919,12 +1083,23 @@
         }
       },
       "delete": {
-        "tags": ["Favorites"],
+        "tags": [
+          "Favorites"
+        ],
         "summary": "Remove a recipe from the favourites",
         "description": "Removes the recipe from the favourites of the authenticated user. The operation is idempotent: removing a recipe that is not a favourite is not an error.",
         "operationId": "removeFromFavorites",
-        "security": [{ "sessionCookie": [], "accessTokenCookie": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/FavoriteRecipeId" }],
+        "security": [
+          {
+            "sessionCookie": [],
+            "accessTokenCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FavoriteRecipeId"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The recipe has been removed from the favourites.",
@@ -954,7 +1129,9 @@
     },
     "/api-docs": {
       "get": {
-        "tags": ["Documentation"],
+        "tags": [
+          "Documentation"
+        ],
         "summary": "Swagger UI",
         "description": "Interactive documentation of the API. The raw OpenAPI document is available at `GET /api-docs.json`.",
         "operationId": "getApiDocs",
@@ -977,7 +1154,9 @@
     },
     "/api-docs.json": {
       "get": {
-        "tags": ["Documentation"],
+        "tags": [
+          "Documentation"
+        ],
         "summary": "OpenAPI document",
         "description": "The OpenAPI 3.0 description of this API. The `category` and `area` enums are refreshed from the database on every request.",
         "operationId": "getApiDocsJson",
@@ -1213,7 +1392,9 @@
               "validation": {
                 "query": {
                   "source": "query",
-                  "keys": ["perPage"],
+                  "keys": [
+                    "perPage"
+                  ],
                   "message": "\"perPage\" must be less than or equal to 20"
                 }
               }
@@ -1260,8 +1441,9 @@
           "avatar": {
             "type": "string",
             "format": "uri",
+            "nullable": true,
             "description": "URL of the avatar. Replaced by the uploaded image once `PATCH /api/users/me/avatar` has been called.",
-            "default": "https://ac.goit.global/fullstack/react/default-avatar.jpg"
+            "default": null
           },
           "favorites": {
             "type": "array",
@@ -1284,7 +1466,6 @@
           "_id",
           "name",
           "email",
-          "avatar",
           "favorites",
           "createdAt",
           "updatedAt"
@@ -1314,19 +1495,17 @@
             "example": "Pa$$w0rd"
           }
         },
-        "required": ["name", "email", "password"],
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
         "additionalProperties": false
       },
       "LoginRequest": {
         "type": "object",
         "description": "Payload of `POST /api/auth/login`. Mirrors the `loginUserSchema` Joi schema.",
         "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 16,
-            "example": "Alice"
-          },
           "email": {
             "type": "string",
             "format": "email",
@@ -1338,7 +1517,10 @@
             "example": "Pa$$w0rd"
           }
         },
-        "required": ["name", "email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "additionalProperties": false
       },
       "RequestResetEmailRequest": {
@@ -1351,7 +1533,9 @@
             "example": "alice@example.com"
           }
         },
-        "required": ["email"],
+        "required": [
+          "email"
+        ],
         "additionalProperties": false
       },
       "ResetPasswordRequest": {
@@ -1370,7 +1554,10 @@
             "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           }
         },
-        "required": ["password", "token"],
+        "required": [
+          "password",
+          "token"
+        ],
         "additionalProperties": false
       },
       "RecipeIngredientInput": {
@@ -1411,7 +1598,10 @@
             "example": "200g"
           }
         },
-        "required": ["id", "measure"]
+        "required": [
+          "id",
+          "measure"
+        ]
       },
       "CreateRecipeRequest": {
         "type": "object",
@@ -1759,7 +1949,13 @@
             }
           }
         },
-        "required": ["page", "perPage", "totalItems", "totalPages", "recipes"]
+        "required": [
+          "page",
+          "perPage",
+          "totalItems",
+          "totalPages",
+          "recipes"
+        ]
       },
       "Category": {
         "type": "object",
@@ -1775,7 +1971,10 @@
             "example": "Dessert"
           }
         },
-        "required": ["_id", "name"]
+        "required": [
+          "_id",
+          "name"
+        ]
       },
       "Ingredient": {
         "type": "object",
@@ -1801,7 +2000,10 @@
             "example": "https://res.cloudinary.com/yumio/image/upload/tomato.jpg"
           }
         },
-        "required": ["_id", "name"]
+        "required": [
+          "_id",
+          "name"
+        ]
       },
       "Area": {
         "type": "object",
@@ -1817,7 +2019,10 @@
             "example": "Italian"
           }
         },
-        "required": ["_id", "name"]
+        "required": [
+          "_id",
+          "name"
+        ]
       },
       "FavoritesResponse": {
         "type": "object",
@@ -1836,7 +2041,10 @@
             }
           }
         },
-        "required": ["message", "favorites"]
+        "required": [
+          "message",
+          "favorites"
+        ]
       },
       "AvatarResponse": {
         "type": "object",
@@ -1849,7 +2057,9 @@
             "example": "https://res.cloudinary.com/yumio/image/upload/v1/yumio-app/avatars/avatar_65f1c2a4b3c2d1e0f1a2b3c4.jpg"
           }
         },
-        "required": ["url"]
+        "required": [
+          "url"
+        ]
       },
       "MessageResponse": {
         "type": "object",
@@ -1860,7 +2070,9 @@
             "example": "Session refreshed"
           }
         },
-        "required": ["message"]
+        "required": [
+          "message"
+        ]
       },
       "Error": {
         "type": "object",
@@ -1871,7 +2083,9 @@
             "example": "Recipe not found"
           }
         },
-        "required": ["message"]
+        "required": [
+          "message"
+        ]
       },
       "ValidationError": {
         "type": "object",
@@ -1898,7 +2112,13 @@
                 "source": {
                   "type": "string",
                   "description": "The request segment that failed.",
-                  "enum": ["body", "query", "params", "headers", "cookies"]
+                  "enum": [
+                    "body",
+                    "query",
+                    "params",
+                    "headers",
+                    "cookies"
+                  ]
                 },
                 "keys": {
                   "type": "array",
@@ -1914,11 +2134,20 @@
                   "example": "Invalid id format"
                 }
               },
-              "required": ["source", "keys", "message"]
+              "required": [
+                "source",
+                "keys",
+                "message"
+              ]
             }
           }
         },
-        "required": ["statusCode", "error", "message", "validation"]
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "validation"
+        ]
       }
     }
   }
